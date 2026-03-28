@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comparativo de Cronogramas - Tienda Virtual de Productos para Mascotas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container {
+                padding: 0.5rem;
+            }
+            .compact-header {
+                padding: 0.75rem;
+            }
+            .compact-header h1 {
+                font-size: 1.5rem;
+            }
+            .compact-header h2 {
+                font-size: 1rem;
+            }
+            .stats-card {
+                padding: 0.75rem;
+            }
+            .stats-card p {
+                font-size: 0.875rem;
+            }
+            .phase-legend {
+                font-size: 0.75rem;
+                padding: 0.25rem 0.5rem;
+                margin: 0.125rem;
+            }
+            .gantt-chart-container {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            .activity-row {
+                min-height: 32px;
+            }
+            .gantt-bar {
+                font-size: 8px;
+                height: 16px !important;
+            }
+            .activity-name {
+                font-size: 0.625rem;
+            }
+            .activity-id {
+                font-size: 0.625rem;
+                padding: 0.125rem 0.25rem !important;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .compact-header .flex {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            .compact-header .text-right {
+                text-align: left;
+            }
+            .stats-grid {
+                grid-template-columns: 1fr 1fr !important;
+                gap: 0.5rem !important;
+            }
+            .phase-legend-container {
+                justify-content: center;
+            }
+            .gantt-chart-header {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            .gantt-chart-header h3 {
+                font-size: 1rem;
+            }
+            .gantt-chart-buttons {
+                justify-content: center;
+            }
+            .version-selector {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+        }
+        
+        /* Base Styles */
+        .gantt-chart-container {
+            overflow-x: auto;
+            overflow-y: hidden;
+            border-radius: 0.5rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            gap: 0.75rem;
+        }
+        
+        .phase-legend-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        
+        .activity-name {
+            transition: all 0.2s ease;
+        }
+        
+        .activity-id {
+            transition: all 0.2s ease;
+        }
+        .gantt-bar {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            font-size: clamp(7px, 1.5vw, 9px);
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            border-radius: 3px;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+            letter-spacing: 0.5px;
+            min-height: 16px;
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .gantt-bar:hover {
+            transform: translateY(-2px) scale(1.05);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.3);
+            z-index: 20;
+        }
+        .gantt-bar::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            transition: left 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .gantt-bar:hover::before {
+            left: 100%;
+        }
+        .phase-planning { 
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); 
+            border-left: 4px solid #6d28d9;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 2px 4px rgba(139, 92, 246, 0.2);
+        }
+        .phase-backend { 
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); 
+            border-left: 4px solid #b91c1c;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 2px 4px rgba(239, 68, 68, 0.2);
+        }
+        .phase-frontend { 
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
+            border-left: 4px solid #1d4ed8;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 2px 4px rgba(59, 130, 246, 0.2);
+        }
+        .phase-integration { 
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); 
+            border-left: 4px solid #15803d;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 2px 4px rgba(34, 197, 94, 0.2);
+        }
+        .phase-deployment { 
+            background: linear-gradient(135deg, #eab308 0%, #d97706 100%); 
+            border-left: 4px solid #b45309;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 2px 4px rgba(234, 179, 8, 0.2);
+        }
+        .critical-path { 
+            border: 2px solid #f97316; 
+            box-shadow: 0 0 20px rgba(249, 115, 22, 0.6), inset 0 0 0 1px rgba(255,255,255,0.4), 0 4px 8px rgba(0,0,0,0.15); 
+            animation: pulse-critical 2s infinite;
+            position: relative;
+        }
+        .critical-path::after {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, #f97316, #fb923c, #f97316);
+            border-radius: 4px;
+            z-index: -1;
+            opacity: 0.7;
+            animation: rotate-gradient 3s linear infinite;
+        }
+        @keyframes pulse-critical {
+            0%, 100% { 
+                box-shadow: 0 0 15px rgba(249, 115, 22, 0.4), inset 0 0 0 1px rgba(255,255,255,0.3), 0 4px 8px rgba(0,0,0,0.15); 
+                transform: scale(1);
+            }
+            50% { 
+                box-shadow: 0 0 25px rgba(249, 115, 22, 0.8), inset 0 0 0 1px rgba(255,255,255,0.5), 0 6px 12px rgba(0,0,0,0.2); 
+                transform: scale(1.02);
+            }
+        }
+        @keyframes rotate-gradient {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .timeline-grid {
+            background-image: linear-gradient(to right, #e5e7eb 1px, transparent 1px);
+            background-size: 25px 100%;
+            border-radius: 8px;
+        }
+        .week-marker {
+            border-left: 2px solid #d1d5db;
+            position: relative;
+        }
+        .week-marker:nth-child(4n) {
+            border-left-color: #9ca3af;
+            border-left-width: 3px;
+        }
+        .activity-row {
+            transition: all 0.2s ease;
+            border-left: 2px solid transparent;
+            min-height: 28px;
+        }
+        .activity-row:hover {
+            background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%);
+            border-left-color: #3b82f6;
+            transform: translateX(1px);
+        }
+        .compact-header {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            color: white;
+            padding: 1rem;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+        }
+        .stats-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border-top: 3px solid;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .stats-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        .phase-legend {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin: 0.25rem;
+            transition: all 0.2s ease;
+        }
+        .phase-legend:hover {
+            transform: scale(1.05);
+        }
+        .changed-task {
+            position: relative;
+        }
+        .changed-task::before {
+            content: '🔄';
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            font-size: 12px;
+            background: #fbbf24;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+        .new-task {
+            position: relative;
+        }
+        .new-task::before {
+            content: '✨';
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            font-size: 12px;
+            background: #10b981;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+        .version-selector {
+            background: white;
+            border-radius: 12px;
+            padding: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1rem;
+        }
+        .version-btn {
+            transition: all 0.3s ease;
+        }
+        .version-btn.active {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            transform: scale(1.05);
+        }
+        /* Compact Comparison Styles */
+        .comparison-gantt {
+            background: linear-gradient(to right, #f8fafc 0%, #f1f5f9 100%);
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .compact-timeline {
+            background-image: linear-gradient(to right, #e2e8f0 1px, transparent 1px);
+            background-size: 25px 100%;
+            border-radius: 6px;
+            position: relative;
+        }
+        
+        .compact-gantt-bar {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            font-size: clamp(6px, 1.2vw, 8px);
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            border-radius: 2px;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+            letter-spacing: 0.3px;
+            min-height: 12px;
+            border: 1px solid rgba(255,255,255,0.3);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        
+        .compact-gantt-bar:hover {
+            transform: translateY(-1px) scale(1.02);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.4);
+            z-index: 10;
+        }
+        
+        .compact-gantt-bar::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+            transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .compact-gantt-bar:hover::before {
+            left: 100%;
+        }
+        
+        .compact-gantt-bar.critical-path {
+            border: 1.5px solid #f97316;
+            box-shadow: 0 0 15px rgba(249, 115, 22, 0.7), inset 0 0 0 1px rgba(255,255,255,0.4), 0 2px 4px rgba(0,0,0,0.2);
+            animation: compact-pulse-critical 2s infinite;
+        }
+        
+        .compact-gantt-bar.critical-path::after {
+            content: '';
+            position: absolute;
+            top: -1.5px;
+            left: -1.5px;
+            right: -1.5px;
+            bottom: -1.5px;
+            background: linear-gradient(45deg, #f97316, #fb923c, #f97316);
+            border-radius: 3px;
+            z-index: -1;
+            opacity: 0.8;
+            animation: rotate-gradient 3s linear infinite;
+        }
+        
+        @keyframes compact-pulse-critical {
+            0%, 100% { 
+                box-shadow: 0 0 12px rgba(249, 115, 22, 0.5), inset 0 0 0 1px rgba(255,255,255,0.3), 0 2px 4px rgba(0,0,0,0.15);
+                transform: scale(1);
+            }
+            50% { 
+                box-shadow: 0 0 20px rgba(249, 115, 22, 0.9), inset 0 0 0 1px rgba(255,255,255,0.5), 0 3px 6px rgba(0,0,0,0.25);
+                transform: scale(1.01);
+            }
+        }
+        
+        .compact-activity-row {
+            transition: all 0.2s ease;
+            border-left: 2px solid transparent;
+            min-height: 20px;
+            padding: 2px 0;
+        }
+        
+        .compact-activity-row:hover {
+            background: linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 100%);
+            border-left-color: #3b82f6;
+            transform: translateX(1px);
+        }
+        
+        .compact-activity-id {
+            font-size: clamp(6px, 1.2vw, 8px);
+            font-weight: 700;
+            padding: 1px 3px;
+            border-radius: 3px;
+            min-width: 20px;
+            text-align: center;
+            display: inline-block;
+        }
+        
+        .compact-activity-name {
+            font-size: clamp(7px, 1.3vw, 9px);
+            font-weight: 500;
+            line-height: 1.2;
+        }
+        
+        .comparison-header {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .comparison-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        
+        .comparison-stat-card {
+            background: white;
+            border-radius: 8px;
+            padding: 0.75rem;
+            box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+            border-left: 3px solid;
+            transition: transform 0.2s ease;
+        }
+        
+        .comparison-stat-card:hover {
+            transform: translateY(-1px);
+        }
+        
+        .week-header {
+            background: linear-gradient(135deg, #475569 0%, #64748b 100%);
+            color: white;
+            padding: 0.5rem;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            font-size: clamp(8px, 1.4vw, 10px);
+            text-align: center;
+            box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
+    <div class="container mx-auto px-4 py-6 max-w-8xl">
+        <!-- Compact Header -->
+        <header class="compact-header">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-3xl font-bold mb-1">Comparativo de Cronogramas</h1>
+                    <h2 class="text-lg opacity-90">Tienda Virtual de Productos para Mascotas</h2>
+                </div>
+                <div class="text-right">
+                    <div class="text-2xl font-bold comparison-indicator">Antes vs Después</div>
+                    <div class="text-sm opacity-75">Análisis de Impacto</div>
+                </div>
+            </div>
+            <div class="flex gap-6 mt-4">
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 bg-blue-400 rounded-full"></div>
+                    <span class="text-sm">Original: Perros y Gatos</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 bg-green-400 rounded-full"></div>
+                    <span class="text-sm">Actualizado: Todas las mascotas</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 bg-orange-400 rounded-full animate-pulse"></div>
+                    <span class="text-sm">+10 días</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Version Selector -->
+        <div class="version-selector">
+            <div class="version-selector flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Seleccionar Versión del Cronograma</h3>
+                    <p class="text-sm text-gray-600">Compara el cronograma original con el actualizado después de los cambios</p>
+                </div>
+                <div class="flex gap-3">
+                    <button id="btnOriginal" class="version-btn px-6 py-3 bg-blue-100 text-blue-700 rounded-lg font-medium hover:bg-blue-200 transition active" onclick="showVersion('original')">
+                        📊 Original
+                        <div class="text-xs opacity-75">Perros y Gatos</div>
+                    </button>
+                    <button id="btnUpdated" class="version-btn px-6 py-3 bg-green-100 text-green-700 rounded-lg font-medium hover:bg-green-200 transition" onclick="showVersion('updated')">
+                        🔄 Actualizado
+                        <div class="text-xs opacity-75">Expandido</div>
+                    </button>
+                    <button id="btnComparison" class="version-btn px-6 py-3 bg-purple-100 text-purple-700 rounded-lg font-medium hover:bg-purple-200 transition" onclick="showVersion('comparison')">
+                        ⚖️ Comparación
+                        <div class="text-xs opacity-75">Side by Side</div>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Original Version -->
+        <div id="originalVersion" class="version-content">
+            <!-- Impact Summary -->
+            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl shadow-lg p-6 mb-6 border-l-4 border-blue-500">
+                <h3 class="text-lg font-semibold mb-4 text-gray-800">📊 Cronograma Original</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-white rounded-lg p-4">
+                        <h4 class="font-semibold text-blue-600 mb-2">🎯 Alcance Original</h4>
+                        <ul class="text-sm text-gray-700 space-y-1">
+                            <li>• Perros y gatos únicamente</li>
+                            <li>• Catálogo simple</li>
+                            <li>• Filtros básicos</li>
+                            <li>• Recomendaciones simples</li>
+                        </ul>
+                    </div>
+                    <div class="bg-white rounded-lg p-4">
+                        <h4 class="font-semibold text-blue-600 mb-2">📈 Métricas</h4>
+                        <ul class="text-sm text-gray-700 space-y-1">
+                            <li>• 25 actividades totales</li>
+                            <li>• 11 actividades críticas</li>
+                            <li>• 52 días ruta crítica</li>
+                            <li>• 15+ personal requerido</li>
+                        </ul>
+                    </div>
+                    <div class="bg-white rounded-lg p-4">
+                        <h4 class="font-semibold text-blue-600 mb-2">🗓️ Timeline</h4>
+                        <ul class="text-sm text-gray-700 space-y-1">
+                            <li>• Inicio: Día 1</li>
+                            <li>• Fin: Día 41</li>
+                            <li>• Duración: 6 semanas</li>
+                            <li>• Entrega única</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Compact Legend -->
+            <div class="bg-white rounded-xl shadow-sm p-4 mb-6">
+                <h3 class="text-sm font-semibold mb-3 text-gray-700 uppercase tracking-wide">Fases del Proyecto</h3>
+                <div class="phase-legend-container">
+                    <div class="phase-legend bg-purple-50 text-purple-700 border border-purple-200">
+                        <div class="w-3 h-3 rounded phase-planning mr-2"></div>
+                        Planificación
+                    </div>
+                    <div class="phase-legend bg-red-50 text-red-700 border border-red-200">
+                        <div class="w-3 h-3 rounded phase-backend mr-2"></div>
+                        Backend
+                    </div>
+                    <div class="phase-legend bg-blue-50 text-blue-700 border border-blue-200">
+                        <div class="w-3 h-3 rounded phase-frontend mr-2"></div>
+                        Frontend
+                    </div>
+                    <div class="phase-legend bg-green-50 text-green-700 border border-green-200">
+                        <div class="w-3 h-3 rounded phase-integration mr-2"></div>
+                        Integración
+                    </div>
+                    <div class="phase-legend bg-yellow-50 text-yellow-700 border border-yellow-200">
+                        <div class="w-3 h-3 rounded phase-deployment mr-2"></div>
+                        Despliegue
+                    </div>
+                    <div class="phase-legend bg-red-100 text-red-800 border-2 border-red-500">
+                        <div class="w-3 h-3 rounded border-2 border-red-500 bg-white mr-2"></div>
+                        Ruta Crítica
+                    </div>
+                </div>
+            </div>
+
+            <!-- Compact Statistics -->
+            <div class="stats-grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                <div class="stats-card border-t-blue-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Total</p>
+                            <p class="text-xl font-bold text-gray-800">25</p>
+                        </div>
+                        <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <span class="text-blue-600 font-bold">25</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="stats-card border-t-red-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Críticas</p>
+                            <p class="text-xl font-bold text-red-600">11</p>
+                        </div>
+                        <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                            <span class="text-red-600 font-bold">11</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="stats-card border-green-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Personal</p>
+                            <p class="text-xl font-bold text-green-600">15+</p>
+                        </div>
+                        <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                            <span class="text-green-600 font-bold">15+</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="stats-card border-purple-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Final</p>
+                            <p class="text-xl font-bold text-purple-600">D41</p>
+                        </div>
+                        <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                            <span class="text-purple-600 font-bold">41</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Original Gantt Chart -->
+            <div class="bg-white rounded-xl shadow-lg p-4 mb-6">
+                <div class="gantt-chart-header flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-700">Cronograma Original</h3>
+                    <div class="gantt-chart-buttons flex gap-2">
+                        <button class="px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm font-medium hover:bg-blue-200 transition">Ver Ruta Crítica</button>
+                        <button class="px-3 py-1 bg-gray-100 text-gray-700 rounded text-sm font-medium hover:bg-gray-200 transition">Expandir</button>
+                    </div>
+                </div>
+                <div class="gantt-chart-container">
+                    <div id="ganttChartOriginal" class="timeline-grid" style="min-width: 1200px;">
+                        <!-- Timeline Header -->
+                        <div class="flex border-b border-gray-200 pb-2 mb-3">
+                            <div class="w-36 md:w-44 font-semibold text-gray-700 text-sm">Actividad</div>
+                            <div class="flex-1 flex overflow-x-auto">
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">Sem 1</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">Sem 2</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">Sem 3</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">Sem 4</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">Sem 5</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">Sem 6</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">Sem 7</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">Sem 8</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">Sem 9</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">Sem 10</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">Sem 11</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">Sem 12</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">Sem 13</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">Sem 14</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">Sem 15</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">Sem 16</div>
+                            </div>
+                        </div>
+                        <!-- Gantt Bars -->
+                        <div id="ganttBarsOriginal"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Updated Version -->
+        <div id="updatedVersion" class="version-content hidden">
+            <!-- Impact Summary -->
+            <div class="bg-gradient-to-r from-orange-50 to-red-50 rounded-xl shadow-lg p-6 mb-6 border-l-4 border-orange-500">
+                <h3 class="text-lg font-semibold mb-4 text-gray-800">📊 Cronograma Actualizado</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-white rounded-lg p-4">
+                        <h4 class="font-semibold text-orange-600 mb-2">🎯 Alcance Expandido</h4>
+                        <ul class="text-sm text-gray-700 space-y-1">
+                            <li>• Perros, gatos, aves, roedores</li>
+                            <li>• Catálogo multi-categoría</li>
+                            <li>• Filtros avanzados</li>
+                            <li>• Recomendaciones IA</li>
+                        </ul>
+                    </div>
+                    <div class="bg-white rounded-lg p-4">
+                        <h4 class="font-semibold text-orange-600 mb-2">📈 Métricas Actualizadas</h4>
+                        <ul class="text-sm text-gray-700 space-y-1">
+                            <li>• 30 actividades totales</li>
+                            <li>• 12 actividades críticas</li>
+                            <li>• 62 días ruta crítica</li>
+                            <li>• 17+ personal requerido</li>
+                        </ul>
+                    </div>
+                    <div class="bg-white rounded-lg p-4">
+                        <h4 class="font-semibold text-orange-600 mb-2">🗓️ Timeline Actualizado</h4>
+                        <ul class="text-sm text-gray-700 space-y-1">
+                            <li>• Inicio: Día 1</li>
+                            <li>• Fin: Día 49</li>
+                            <li>• Duración: 7 semanas</li>
+                            <li>• +10 días adicionales</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Compact Legend -->
+            <div class="bg-white rounded-xl shadow-sm p-4 mb-6">
+                <h3 class="text-sm font-semibold mb-3 text-gray-700 uppercase tracking-wide">Fases del Proyecto</h3>
+                <div class="phase-legend-container">
+                    <div class="phase-legend bg-purple-50 text-purple-700 border border-purple-200">
+                        <div class="w-3 h-3 rounded phase-planning mr-2"></div>
+                        Planificación
+                    </div>
+                    <div class="phase-legend bg-red-50 text-red-700 border border-red-200">
+                        <div class="w-3 h-3 rounded phase-backend mr-2"></div>
+                        Backend
+                    </div>
+                    <div class="phase-legend bg-blue-50 text-blue-700 border border-blue-200">
+                        <div class="w-3 h-3 rounded phase-frontend mr-2"></div>
+                        Frontend
+                    </div>
+                    <div class="phase-legend bg-green-50 text-green-700 border border-green-200">
+                        <div class="w-3 h-3 rounded phase-integration mr-2"></div>
+                        Integración
+                    </div>
+                    <div class="phase-legend bg-yellow-50 text-yellow-700 border border-yellow-200">
+                        <div class="w-3 h-3 rounded phase-deployment mr-2"></div>
+                        Despliegue
+                    </div>
+                    <div class="phase-legend bg-red-100 text-red-800 border-2 border-red-500">
+                        <div class="w-3 h-3 rounded border-2 border-red-500 bg-white mr-2"></div>
+                        Ruta Crítica
+                    </div>
+                    <div class="phase-legend bg-orange-50 text-orange-700 border border-orange-200">
+                        <div class="w-3 h-3 rounded bg-orange-400 mr-2"></div>
+                        Modificadas
+                    </div>
+                    <div class="phase-legend bg-green-50 text-green-700 border border-green-200">
+                        <div class="w-3 h-3 rounded bg-green-400 mr-2"></div>
+                        Nuevas
+                    </div>
+                </div>
+            </div>
+
+            <!-- Compact Statistics -->
+            <div class="stats-grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                <div class="stats-card border-t-blue-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Total</p>
+                            <p class="text-xl font-bold text-gray-800">30</p>
+                        </div>
+                        <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <span class="text-blue-600 font-bold">30</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="stats-card border-t-red-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Críticas</p>
+                            <p class="text-xl font-bold text-red-600">12</p>
+                        </div>
+                        <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                            <span class="text-red-600 font-bold">12</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="stats-card border-green-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Nuevas</p>
+                            <p class="text-xl font-bold text-green-600">5</p>
+                        </div>
+                        <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                            <span class="text-green-600 font-bold">5</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="stats-card border-orange-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Modificadas</p>
+                            <p class="text-xl font-bold text-orange-600">8</p>
+                        </div>
+                        <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                            <span class="text-orange-600 font-bold">8</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Updated Gantt Chart -->
+            <div class="bg-white rounded-xl shadow-lg p-4 mb-6">
+                <div class="gantt-chart-header flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-700">Cronograma Actualizado Mejorado</h3>
+                    <div class="gantt-chart-buttons flex gap-2">
+                        <button class="px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm font-medium hover:bg-blue-200 transition">Ver Ruta Crítica</button>
+                        <button class="px-3 py-1 bg-gray-100 text-gray-700 rounded text-sm font-medium hover:bg-gray-200 transition">Expandir</button>
+                    </div>
+                </div>
+                <div class="gantt-chart-container">
+                    <div id="ganttChartUpdated" class="timeline-grid" style="min-width: 1200px;">
+                        <!-- Timeline Header -->
+                        <div class="flex border-b border-gray-200 pb-2 mb-3">
+                            <div class="w-36 md:w-44 font-semibold text-gray-700 text-sm">Actividad</div>
+                            <div class="flex-1 flex overflow-x-auto">
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">S1</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">S2</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">S3</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">S4</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">S5</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">S6</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">S7</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">S8</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">S9</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">S10</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">S11</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">S12</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">S13</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">S14</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">S15</div>
+                                <div class="text-xs text-gray-500 font-medium flex-shrink-0" style="width: 50px;">S16</div>
+                            </div>
+                        </div>
+                        <!-- Gantt Bars -->
+                        <div id="ganttBarsUpdated"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comparison Version -->
+        <div id="comparisonVersion" class="version-content hidden">
+            <!-- Comparison Summary -->
+            <div class="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl shadow-lg p-6 mb-6 border-l-4 border-purple-500">
+                <h3 class="text-lg font-semibold mb-4 text-gray-800">⚖️ Análisis Comparativo</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-lg p-4">
+                        <h4 class="font-semibold text-blue-600 mb-3">📊 Cambios Principales</h4>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center p-2 bg-gray-50 rounded">
+                                <span class="text-sm font-medium">Actividades Totales</span>
+                                <span class="text-sm font-bold text-blue-600">25 → 30 (+20%)</span>
+                            </div>
+                            <div class="flex justify-between items-center p-2 bg-gray-50 rounded">
+                                <span class="text-sm font-medium">Duración Crítica</span>
+                                <span class="text-sm font-bold text-orange-600">52 → 62 días (+19%)</span>
+                            </div>
+                            <div class="flex justify-between items-center p-2 bg-gray-50 rounded">
+                                <span class="text-sm font-medium">Personal Requerido</span>
+                                <span class="text-sm font-bold text-green-600">15+ → 17+ (+13%)</span>
+                            </div>
+                            <div class="flex justify-between items-center p-2 bg-gray-50 rounded">
+                                <span class="text-sm font-medium">Fecha Final</span>
+                                <span class="text-sm font-bold text-purple-600">Día 41 → Día 49</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg p-4">
+                        <h4 class="font-semibold text-purple-600 mb-3">🎯 Impacto por Área</h4>
+                        <div class="space-y-3">
+                            <div class="p-2 bg-red-50 rounded">
+                                <div class="text-sm font-medium text-red-700">Backend (+8 días)</div>
+                                <div class="text-xs text-gray-600">Catálogo, búsqueda, recomendaciones</div>
+                            </div>
+                            <div class="p-2 bg-blue-50 rounded">
+                                <div class="text-sm font-medium text-blue-700">Frontend (+2 días)</div>
+                                <div class="text-xs text-gray-600">Páginas, panel admin</div>
+                            </div>
+                            <div class="p-2 bg-purple-50 rounded">
+                                <div class="text-sm font-medium text-purple-700">Planificación (+3 días)</div>
+                                <div class="text-xs text-gray-600">Requisitos, diseño, BD</div>
+                            </div>
+                            <div class="p-2 bg-green-50 rounded">
+                                <div class="text-sm font-medium text-green-700">Integración (+3 días)</div>
+                                <div class="text-xs text-gray-600">Pruebas, correcciones</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Side-by-Side Comparison -->
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                <div class="comparison-header mb-6">
+                    <h3 class="text-xl font-bold mb-2">⚖️ Comparación Side-by-Side</h3>
+                    <p class="text-sm opacity-90">Visualización directa de las diferencias entre cronogramas</p>
+                </div>
+                
+                <!-- Comparison Stats Summary -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-blue-50 rounded-lg p-4 text-center">
+                        <div class="text-2xl font-bold text-blue-600">+5</div>
+                        <div class="text-xs text-gray-600">Actividades Nuevas</div>
+                    </div>
+                    <div class="bg-orange-50 rounded-lg p-4 text-center">
+                        <div class="text-2xl font-bold text-orange-600">+10d</div>
+                        <div class="text-xs text-gray-600">Duración Adicional</div>
+                    </div>
+                    <div class="bg-green-50 rounded-lg p-4 text-center">
+                        <div class="text-2xl font-bold text-green-600">+1</div>
+                        <div class="text-xs text-gray-600">Críticas Adicionales</div>
+                    </div>
+                    <div class="bg-purple-50 rounded-lg p-4 text-center">
+                        <div class="text-2xl font-bold text-purple-600">+8</div>
+                        <div class="text-xs text-gray-600">Modificadas</div>
+                    </div>
+                </div>
+                
+                <!-- Gantt Charts Side by Side -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Original Column -->
+                    <div class="bg-gray-50 rounded-xl p-4">
+                        <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg p-3 mb-4">
+                            <h4 class="font-bold text-sm">📊 Cronograma Original</h4>
+                            <div class="text-xs opacity-90">Perros y Gatos • 25 actividades • 52 días</div>
+                        </div>
+                        <div class="comparison-gantt">
+                            <div class="week-header flex bg-gray-200 text-gray-700">
+                                <div class="w-20 text-xs font-bold">ID</div>
+                                <div class="flex-1 flex justify-between text-xs">
+                                    <div>S1</div><div>S2</div><div>S3</div><div>S4</div><div>S5</div><div>S6</div><div>S7</div><div>S8</div>
+                                </div>
+                            </div>
+                            <div id="ganttChartOriginalComp" class="compact-timeline" style="min-height: 300px; max-height: 400px; overflow-y: auto;">
+                                <div id="ganttBarsOriginalComp"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Updated Column -->
+                    <div class="bg-gray-50 rounded-xl p-4">
+                        <div class="bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg p-3 mb-4">
+                            <h4 class="font-bold text-sm">🔄 Cronograma Actualizado</h4>
+                            <div class="text-xs opacity-90">Todas las mascotas • 30 actividades • 62 días</div>
+                        </div>
+                        <div class="comparison-gantt">
+                            <div class="week-header flex bg-orange-200 text-orange-700">
+                                <div class="w-20 text-xs font-bold">ID</div>
+                                <div class="flex-1 flex justify-between text-xs">
+                                    <div>S1</div><div>S2</div><div>S3</div><div>S4</div><div>S5</div><div>S6</div><div>S7</div><div>S8</div>
+                                </div>
+                            </div>
+                            <div id="ganttChartUpdatedComp" class="compact-timeline" style="min-height: 300px; max-height: 400px; overflow-y: auto;">
+                                <div id="ganttBarsUpdatedComp"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Legend for Comparison -->
+                <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+                    <h4 class="text-sm font-semibold text-gray-700 mb-3">Leyenda de Cambios</h4>
+                    <div class="flex flex-wrap gap-3">
+                        <div class="flex items-center gap-2 text-xs">
+                            <div class="w-3 h-3 bg-blue-100 rounded"></div>
+                            <span>Original</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-xs">
+                            <div class="w-3 h-3 bg-orange-100 rounded"></div>
+                            <span>Modificada</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-xs">
+                            <div class="w-3 h-3 bg-green-100 rounded"></div>
+                            <span>Nueva</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-xs">
+                            <div class="w-3 h-3 border-2 border-orange-500 rounded"></div>
+                            <span>Ruta Crítica</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Comparison Table -->
+            <div class="bg-white rounded-xl shadow-lg p-4">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">📋 Tabla Comparativa Detallada</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                        <thead class="bg-gray-50 border-b border-gray-200">
+                            <tr>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-700">ID</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-700">Actividad</th>
+                                <th class="px-3 py-2 text-center font-semibold text-gray-700">Dur. Original</th>
+                                <th class="px-3 py-2 text-center font-semibold text-gray-700">Dur. Actualizada</th>
+                                <th class="px-3 py-2 text-center font-semibold text-gray-700">Cambio</th>
+                                <th class="px-3 py-2 text-center font-semibold text-gray-700">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="comparisonTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal for Activity Details -->
+        <div id="activityModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+            <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                <h3 class="text-xl font-semibold mb-4" id="modalTitle">Detalles de Actividad</h3>
+                <div id="modalContent"></div>
+                <button onclick="closeModal()" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Original project data
+        const originalActivities = [
+            { id: 'A1', name: 'Investigación de mercado', duration: 5, start: 1, end: 5, phase: 'planning', critical: true, resources: '1 Analista de negocio' },
+            { id: 'A2', name: 'Definición de requisitos', duration: 3, start: 6, end: 8, phase: 'planning', critical: true, resources: '1 Analista, 1 Arquitecto' },
+            { id: 'A3', name: 'Diseño de arquitectura', duration: 4, start: 9, end: 12, phase: 'planning', critical: false, resources: '1 Arquitecto' },
+            { id: 'A4', name: 'Diseño UI/UX', duration: 6, start: 9, end: 14, phase: 'planning', critical: true, resources: '1 UX, 1 UI' },
+            { id: 'A5', name: 'Diseño de base de datos', duration: 3, start: 9, end: 11, phase: 'planning', critical: false, resources: '1 Arquitecto' },
+            { id: 'A6', name: 'Configuración entorno', duration: 2, start: 13, end: 14, phase: 'backend', critical: false, resources: '1 DevOps, 1 Backend' },
+            { id: 'A7', name: 'Autenticación y registro', duration: 4, start: 15, end: 18, phase: 'backend', critical: false, resources: '2 Backend' },
+            { id: 'A8', name: 'Catálogo de productos', duration: 5, start: 19, end: 23, phase: 'backend', critical: false, resources: '2 Backend' },
+            { id: 'A9', name: 'Sistema de búsqueda', duration: 3, start: 24, end: 26, phase: 'backend', critical: false, resources: '1 Backend' },
+            { id: 'A10', name: 'Carrito de compras', duration: 4, start: 24, end: 27, phase: 'backend', critical: false, resources: '2 Backend' },
+            { id: 'A11', name: 'Proceso de pago', duration: 6, start: 28, end: 33, phase: 'backend', critical: false, resources: '2 Backend, 1 Experto pagos' },
+            { id: 'A12', name: 'Sistema de recomendaciones', duration: 5, start: 24, end: 28, phase: 'backend', critical: false, resources: '1 Backend, 1 Data scientist' },
+            { id: 'A13', name: 'Reportes de ventas', duration: 4, start: 29, end: 32, phase: 'backend', critical: false, resources: '1 Backend' },
+            { id: 'A14', name: 'Páginas principales', duration: 5, start: 15, end: 19, phase: 'frontend', critical: true, resources: '2 Frontend' },
+            { id: 'A15', name: 'Carrito y checkout', duration: 4, start: 20, end: 23, phase: 'frontend', critical: false, resources: '2 Frontend' },
+            { id: 'A16', name: 'Panel de administración', duration: 6, start: 20, end: 25, phase: 'frontend', critical: false, resources: '2 Frontend' },
+            { id: 'A17', name: 'Integración con APIs', duration: 5, start: 20, end: 24, phase: 'frontend', critical: true, resources: '2 Frontend, 1 Backend' },
+            { id: 'A18', name: 'Integración completa', duration: 3, start: 25, end: 27, phase: 'integration', critical: true, resources: '1 Full-stack' },
+            { id: 'A19', name: 'Pruebas unitarias/integración', duration: 5, start: 28, end: 32, phase: 'integration', critical: true, resources: '2 QA' },
+            { id: 'A20', name: 'Pruebas de usabilidad', duration: 3, start: 28, end: 30, phase: 'integration', critical: false, resources: '1 UX researcher, 5 testers' },
+            { id: 'A21', name: 'Corrección de errores', duration: 4, start: 33, end: 36, phase: 'integration', critical: true, resources: '2 Full-stack' },
+            { id: 'A22', name: 'Configuración servidor', duration: 2, start: 37, end: 38, phase: 'deployment', critical: true, resources: '1 DevOps' },
+            { id: 'A23', name: 'Despliegue', duration: 2, start: 39, end: 40, phase: 'deployment', critical: true, resources: '1 DevOps, 1 Backend' },
+            { id: 'A24', name: 'Capacitación', duration: 1, start: 41, end: 41, phase: 'deployment', critical: false, resources: '1 Project manager' },
+            { id: 'A25', name: 'Lanzamiento', duration: 1, start: 41, end: 41, phase: 'deployment', critical: true, resources: '1 Project manager, 1 DevOps' }
+        ];
+
+        // Updated project data with changes
+        const updatedActivities = [
+            { id: 'A1', name: 'Investigación de mercado', duration: 5, start: 1, end: 5, phase: 'planning', critical: true, resources: '1 Analista de negocio', change: 'Sin cambios' },
+            { id: 'A2', name: 'Definición de requisitos', duration: 5, start: 6, end: 10, phase: 'planning', critical: true, resources: '1 Analista, 1 Arquitecto', change: '+2 días' },
+            { id: 'A3', name: 'Diseño de arquitectura', duration: 5, start: 11, end: 15, phase: 'planning', critical: false, resources: '1 Arquitecto', change: '+1 día' },
+            { id: 'A4', name: 'Diseño UI/UX', duration: 9, start: 11, end: 19, phase: 'planning', critical: true, resources: '1 UX, 1 UI', change: '+3 días' },
+            { id: 'A5', name: 'Diseño de base de datos', duration: 5, start: 11, end: 15, phase: 'planning', critical: false, resources: '1 Arquitecto', change: '+2 días' },
+            { id: 'A26', name: 'Investigación aves/roedores', duration: 3, start: 6, end: 8, phase: 'planning', critical: false, resources: '1 Analista de negocio', change: 'Nueva tarea' },
+            { id: 'A27', name: 'Diseño taxonomía mascotas', duration: 2, start: 11, end: 12, phase: 'planning', critical: false, resources: '1 Arquitecto', change: 'Nueva tarea' },
+            { id: 'A6', name: 'Configuración entorno', duration: 2, start: 16, end: 17, phase: 'backend', critical: false, resources: '1 DevOps, 1 Backend', change: 'Sin cambios' },
+            { id: 'A7', name: 'Autenticación y registro', duration: 4, start: 18, end: 21, phase: 'backend', critical: false, resources: '2 Backend', change: 'Sin cambios' },
+            { id: 'A8', name: 'Catálogo de productos', duration: 9, start: 22, end: 30, phase: 'backend', critical: true, resources: '3 Backend', change: '+4 días' },
+            { id: 'A9', name: 'Sistema de búsqueda', duration: 6, start: 31, end: 36, phase: 'backend', critical: false, resources: '2 Backend', change: '+3 días' },
+            { id: 'A10', name: 'Carrito de compras', duration: 4, start: 31, end: 34, phase: 'backend', critical: false, resources: '2 Backend', change: 'Sin cambios' },
+            { id: 'A11', name: 'Proceso de pago', duration: 6, start: 37, end: 42, phase: 'backend', critical: false, resources: '2 Backend, 1 Experto pagos', change: 'Sin cambios' },
+            { id: 'A12', name: 'Sistema de recomendaciones', duration: 10, start: 31, end: 40, phase: 'backend', critical: true, resources: '1 Backend, 1.5 Data scientist', change: '+5 días' },
+            { id: 'A13', name: 'Reportes de ventas', duration: 4, start: 43, end: 46, phase: 'backend', critical: false, resources: '1 Backend', change: 'Sin cambios' },
+            { id: 'A28', name: 'Desarrollo filtros avanzados', duration: 4, start: 31, end: 34, phase: 'backend', critical: false, resources: '1 Backend', change: 'Nueva tarea' },
+            { id: 'A14', name: 'Páginas principales', duration: 7, start: 18, end: 24, phase: 'frontend', critical: false, resources: '2 Frontend', change: '+2 días' },
+            { id: 'A15', name: 'Carrito y checkout', duration: 4, start: 25, end: 28, phase: 'frontend', critical: false, resources: '2 Frontend', change: 'Sin cambios' },
+            { id: 'A16', name: 'Panel de administración', duration: 8, start: 25, end: 32, phase: 'frontend', critical: false, resources: '2 Frontend', change: '+2 días' },
+            { id: 'A17', name: 'Integración con APIs', duration: 5, start: 25, end: 29, phase: 'frontend', critical: true, resources: '2 Frontend, 1 Backend', change: 'Sin cambios' },
+            { id: 'A29', name: 'Configuración categorías admin', duration: 2, start: 33, end: 34, phase: 'frontend', critical: false, resources: '1 Frontend', change: 'Nueva tarea' },
+            { id: 'A18', name: 'Integración completa', duration: 3, start: 30, end: 32, phase: 'integration', critical: true, resources: '1 Full-stack', change: 'Sin cambios' },
+            { id: 'A19', name: 'Pruebas unitarias/integración', duration: 8, start: 33, end: 40, phase: 'integration', critical: true, resources: '3 QA', change: '+3 días' },
+            { id: 'A20', name: 'Pruebas de usabilidad', duration: 3, start: 33, end: 35, phase: 'integration', critical: false, resources: '1 UX researcher, 5 testers', change: 'Sin cambios' },
+            { id: 'A21', name: 'Corrección de errores', duration: 4, start: 41, end: 44, phase: 'integration', critical: true, resources: '2 Full-stack', change: 'Sin cambios' },
+            { id: 'A30', name: 'Pruebas específicas por categoría', duration: 3, start: 41, end: 43, phase: 'integration', critical: false, resources: '1 QA', change: 'Nueva tarea' },
+            { id: 'A22', name: 'Configuración servidor', duration: 2, start: 45, end: 46, phase: 'deployment', critical: true, resources: '1 DevOps', change: 'Sin cambios' },
+            { id: 'A23', name: 'Despliegue', duration: 2, start: 47, end: 48, phase: 'deployment', critical: true, resources: '1 DevOps, 1 Backend', change: 'Sin cambios' },
+            { id: 'A24', name: 'Capacitación', duration: 1, start: 49, end: 49, phase: 'deployment', critical: false, resources: '1 Project manager', change: 'Sin cambios' },
+            { id: 'A25', name: 'Lanzamiento', duration: 1, start: 49, end: 49, phase: 'deployment', critical: true, resources: '1 Project manager, 1 DevOps', change: 'Sin cambios' }
+        ];
+
+        // Phase colors
+        const phaseColors = {
+            planning: 'phase-planning',
+            backend: 'phase-backend',
+            frontend: 'phase-frontend',
+            integration: 'phase-integration',
+            deployment: 'phase-deployment'
+        };
+
+        // Phase names in Spanish
+        const phaseNames = {
+            planning: 'Planificación',
+            backend: 'Backend',
+            frontend: 'Frontend',
+            integration: 'Integración',
+            deployment: 'Despliegue'
+        };
+
+        // Version management
+        let currentVersion = 'original';
+
+        function showVersion(version) {
+            currentVersion = version;
+            
+            // Hide all versions
+            document.getElementById('originalVersion').classList.add('hidden');
+            document.getElementById('updatedVersion').classList.add('hidden');
+            document.getElementById('comparisonVersion').classList.add('hidden');
+            
+            // Remove active class from all buttons
+            document.getElementById('btnOriginal').classList.remove('active');
+            document.getElementById('btnUpdated').classList.remove('active');
+            document.getElementById('btnComparison').classList.remove('active');
+            
+            // Show selected version and activate button
+            switch(version) {
+                case 'original':
+                    document.getElementById('originalVersion').classList.remove('hidden');
+                    document.getElementById('btnOriginal').classList.add('active');
+                    break;
+                case 'updated':
+                    document.getElementById('updatedVersion').classList.remove('hidden');
+                    document.getElementById('btnUpdated').classList.add('active');
+                    break;
+                case 'comparison':
+                    document.getElementById('comparisonVersion').classList.remove('hidden');
+                    document.getElementById('btnComparison').classList.add('active');
+                    generateComparisonCharts();
+                    generateComparisonTable();
+                    break;
+            }
+        }
+
+        // Generate Gantt chart for original version
+        function generateOriginalGanttChart() {
+            const container = document.getElementById('ganttBarsOriginal');
+            
+            originalActivities.forEach((activity, index) => {
+                const row = document.createElement('div');
+                row.className = 'activity-row flex items-center mb-1.5 py-1 px-2 rounded';
+                
+                const leftPosition = (activity.start - 1) * 25;
+                const width = activity.duration * 25;
+                
+                row.innerHTML = `
+                    <div class="w-36 md:w-44 pr-2">
+                        <div class="flex items-center gap-1.5">
+                            <span class="activity-id text-xs font-bold text-gray-600 bg-gray-100 px-1 py-0.5 rounded">${activity.id}</span>
+                            <div class="flex-1 min-w-0">
+                                <div class="activity-name text-xs font-medium text-gray-800 leading-tight truncate">${activity.name}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex-1 relative h-6">
+                        <div class="gantt-bar ${phaseColors[activity.phase]} ${activity.critical ? 'critical-path' : ''} 
+                                    rounded text-white text-xs font-medium absolute"
+                             style="left: ${leftPosition}px; width: ${width}px; height: 18px;"
+                             onclick="showActivityDetails('${activity.id}', 'original')"
+                             title="${activity.name} (${activity.duration} días)">
+                            ${activity.duration > 0 ? activity.duration + 'd' : ''}
+                        </div>
+                    </div>
+                `;
+                
+                container.appendChild(row);
+            });
+        }
+
+        // Generate Gantt chart for updated version
+        function generateUpdatedGanttChart() {
+            const container = document.getElementById('ganttBarsUpdated');
+            
+            updatedActivities.forEach((activity, index) => {
+                const row = document.createElement('div');
+                row.className = 'activity-row flex items-center mb-1.5 py-1 px-2 rounded';
+                
+                const leftPosition = (activity.start - 1) * 25;
+                const width = activity.duration * 25;
+                
+                // Add visual indicators for changed and new tasks
+                let taskClass = '';
+                if (activity.change === 'Nueva tarea') {
+                    taskClass = 'new-task';
+                } else if (activity.change !== 'Sin cambios') {
+                    taskClass = 'changed-task';
+                }
+                
+                row.innerHTML = `
+                    <div class="w-36 md:w-44 pr-2">
+                        <div class="flex items-center gap-1.5">
+                            <span class="activity-id text-xs font-bold text-gray-600 bg-gray-100 px-1 py-0.5 rounded ${taskClass}">${activity.id}</span>
+                            <div class="flex-1 min-w-0">
+                                <div class="activity-name text-xs font-medium text-gray-800 leading-tight truncate">${activity.name}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex-1 relative h-6">
+                        <div class="gantt-bar ${phaseColors[activity.phase]} ${activity.critical ? 'critical-path' : ''} 
+                                    rounded text-white text-xs font-medium absolute"
+                             style="left: ${leftPosition}px; width: ${width}px; height: 18px;"
+                             onclick="showActivityDetails('${activity.id}', 'updated')"
+                             title="${activity.name} (${activity.duration} días)">
+                            ${activity.duration > 0 ? activity.duration + 'd' : ''}
+                        </div>
+                    </div>
+                `;
+                
+                container.appendChild(row);
+            });
+        }
+
+        // Generate comparison charts
+        function generateComparisonCharts() {
+            // Original comparison chart
+            const originalContainer = document.getElementById('ganttBarsOriginalComp');
+            originalContainer.innerHTML = '';
+            
+            originalActivities.forEach((activity, index) => {
+                const row = document.createElement('div');
+                row.className = 'compact-activity-row flex items-center';
+                
+                const leftPosition = (activity.start - 1) * 25;
+                const width = activity.duration * 25;
+                
+                row.innerHTML = `
+                    <div class="w-20 pr-2 flex items-center gap-1">
+                        <span class="compact-activity-id bg-blue-100 text-blue-700 text-xs">${activity.id}</span>
+                    </div>
+                    <div class="flex-1 relative h-3">
+                        <div class="compact-gantt-bar ${phaseColors[activity.phase]} ${activity.critical ? 'critical-path' : ''} absolute"
+                             style="left: ${leftPosition}px; width: ${width}px; height: 12px;"
+                             title="${activity.name} (${activity.duration} días)">
+                            ${activity.duration > 3 ? activity.duration + 'd' : ''}
+                        </div>
+                    </div>
+                `;
+                
+                originalContainer.appendChild(row);
+            });
+            
+            // Updated comparison chart
+            const updatedContainer = document.getElementById('ganttBarsUpdatedComp');
+            updatedContainer.innerHTML = '';
+            
+            updatedActivities.forEach((activity, index) => {
+                const row = document.createElement('div');
+                row.className = 'compact-activity-row flex items-center';
+                
+                const leftPosition = (activity.start - 1) * 25;
+                const width = activity.duration * 25;
+                
+                let taskClass = '';
+                let idBgClass = 'bg-orange-100 text-orange-700';
+                if (activity.change === 'Nueva tarea') {
+                    taskClass = 'new-task';
+                    idBgClass = 'bg-green-100 text-green-700';
+                } else if (activity.change !== 'Sin cambios') {
+                    taskClass = 'changed-task';
+                    idBgClass = 'bg-yellow-100 text-yellow-700';
+                }
+                
+                row.innerHTML = `
+                    <div class="w-20 pr-2 flex items-center gap-1">
+                        <span class="compact-activity-id ${idBgClass} ${taskClass} text-xs">${activity.id}</span>
+                    </div>
+                    <div class="flex-1 relative h-3">
+                        <div class="compact-gantt-bar ${phaseColors[activity.phase]} ${activity.critical ? 'critical-path' : ''} absolute"
+                             style="left: ${leftPosition}px; width: ${width}px; height: 12px;"
+                             title="${activity.name} (${activity.duration} días)">
+                            ${activity.duration > 3 ? activity.duration + 'd' : ''}
+                        </div>
+                    </div>
+                `;
+                
+                updatedContainer.appendChild(row);
+            });
+        }
+
+        // Generate comparison table
+        function generateComparisonTable() {
+            const tbody = document.getElementById('comparisonTable');
+            tbody.innerHTML = '';
+            
+            // Create comparison map
+            const comparisonMap = {};
+            updatedActivities.forEach(activity => {
+                comparisonMap[activity.id] = activity;
+            });
+            
+            // Add original activities
+            originalActivities.forEach(original => {
+                const updated = comparisonMap[original.id];
+                const row = document.createElement('tr');
+                row.className = 'border-b border-gray-100 hover:bg-gray-50 transition';
+                
+                let changeIndicator = '';
+                let changeClass = '';
+                let changeText = '';
+                
+                if (updated) {
+                    if (updated.change === 'Nueva tarea') {
+                        changeIndicator = '<span class="inline-flex items-center gap-1 text-green-600 font-medium"><span class="w-2 h-2 bg-green-500 rounded-full"></span>Nueva</span>';
+                        changeClass = 'text-green-600';
+                        changeText = updated.change;
+                    } else if (updated.change !== 'Sin cambios') {
+                        changeIndicator = `<span class="inline-flex items-center gap-1 text-orange-600 font-medium"><span class="w-2 h-2 bg-orange-500 rounded-full"></span>${updated.change}</span>`;
+                        changeClass = 'text-orange-600';
+                        changeText = updated.change;
+                    } else {
+                        changeIndicator = '<span class="text-gray-400">Sin cambios</span>';
+                        changeClass = 'text-gray-600';
+                        changeText = 'Sin cambios';
+                    }
+                } else {
+                    changeIndicator = '<span class="text-gray-400">-</span>';
+                    changeClass = 'text-gray-600';
+                    changeText = 'Sin cambios';
+                }
+                
+                row.innerHTML = `
+                    <td class="px-3 py-2 font-medium text-gray-700">
+                        <span class="inline-block w-12 text-center bg-gray-100 rounded px-1 py-0.5 text-xs font-bold">${original.id}</span>
+                    </td>
+                    <td class="px-3 py-2 text-gray-800">${original.name}</td>
+                    <td class="px-3 py-2 text-center">
+                        <span class="inline-block bg-blue-100 text-blue-700 rounded px-2 py-0.5 text-xs font-medium">${original.duration}d</span>
+                    </td>
+                    <td class="px-3 py-2 text-center">
+                        ${updated ? `<span class="inline-block bg-orange-100 text-orange-700 rounded px-2 py-0.5 text-xs font-medium">${updated.duration}d</span>` : '<span class="text-gray-400">-</span>'}
+                    </td>
+                    <td class="px-3 py-2 text-center ${changeClass} font-medium">
+                        ${updated ? (updated.duration - original.duration > 0 ? `+${updated.duration - original.duration}d` : updated.duration - original.duration < 0 ? `${updated.duration - original.duration}d` : '0d') : '-'}
+                    </td>
+                    <td class="px-3 py-2 text-center">
+                        ${changeIndicator}
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+            
+            // Add new activities
+            updatedActivities.forEach(updated => {
+                const original = originalActivities.find(a => a.id === updated.id);
+                if (!original) {
+                    const row = document.createElement('tr');
+                    row.className = 'border-b border-gray-100 hover:bg-gray-50 transition bg-green-50';
+                    
+                    row.innerHTML = `
+                        <td class="px-3 py-2 font-medium text-gray-700">
+                            <span class="inline-block w-12 text-center bg-green-100 rounded px-1 py-0.5 text-xs font-bold">${updated.id}</span>
+                        </td>
+                        <td class="px-3 py-2 text-gray-800 font-medium">${updated.name}</td>
+                        <td class="px-3 py-2 text-center">
+                            <span class="text-gray-400">-</span>
+                        </td>
+                        <td class="px-3 py-2 text-center">
+                            <span class="inline-block bg-green-100 text-green-700 rounded px-2 py-0.5 text-xs font-medium">${updated.duration}d</span>
+                        </td>
+                        <td class="px-3 py-2 text-center text-green-600 font-medium">
+                            +${updated.duration}d
+                        </td>
+                        <td class="px-3 py-2 text-center">
+                            <span class="inline-flex items-center gap-1 text-green-600 font-medium"><span class="w-2 h-2 bg-green-500 rounded-full"></span>Nueva</span>
+                        </td>
+                    `;
+                    
+                    tbody.appendChild(row);
+                }
+            });
+        }
+
+        // Show activity details in modal
+        function showActivityDetails(activityId, version) {
+            const activities = version === 'original' ? originalActivities : updatedActivities;
+            const activity = activities.find(a => a.id === activityId);
+            if (!activity) return;
+            
+            const modal = document.getElementById('activityModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalContent = document.getElementById('modalContent');
+            
+            modalTitle.textContent = `${activity.id}: ${activity.name}`;
+            
+            let changeInfo = '';
+            if (version === 'updated' && activity.change) {
+                changeInfo = `
+                    <div>
+                        <span class="font-medium text-gray-600">Cambio:</span>
+                        <span class="ml-2 font-semibold ${activity.change === 'Nueva tarea' ? 'text-green-600' : activity.change !== 'Sin cambios' ? 'text-orange-600' : 'text-gray-600'}">${activity.change}</span>
+                    </div>
+                `;
+            }
+            
+            modalContent.innerHTML = `
+                <div class="space-y-3">
+                    <div>
+                        <span class="font-medium text-gray-600">Versión:</span>
+                        <span class="ml-2 font-semibold ${version === 'original' ? 'text-blue-600' : 'text-orange-600'}">${version === 'original' ? 'Original' : 'Actualizado'}</span>
+                    </div>
+                    <div>
+                        <span class="font-medium text-gray-600">Duración:</span>
+                        <span class="ml-2">${activity.duration} días</span>
+                    </div>
+                    <div>
+                        <span class="font-medium text-gray-600">Periodo:</span>
+                        <span class="ml-2">Día ${activity.start} - Día ${activity.end}</span>
+                    </div>
+                    <div>
+                        <span class="font-medium text-gray-600">Fase:</span>
+                        <span class="ml-2">${phaseNames[activity.phase]}</span>
+                    </div>
+                    <div>
+                        <span class="font-medium text-gray-600">Ruta Crítica:</span>
+                        <span class="ml-2">${activity.critical ? 'Sí' : 'No'}</span>
+                    </div>
+                    <div>
+                        <span class="font-medium text-gray-600">Recursos:</span>
+                        <span class="ml-2">${activity.resources}</span>
+                    </div>
+                    ${changeInfo}
+                    <div>
+                        <span class="font-medium text-gray-600">Progreso:</span>
+                        <div class="mt-2 w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-blue-600 h-2 rounded-full" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            modal.classList.remove('hidden');
+        }
+
+        // Close modal
+        function closeModal() {
+            document.getElementById('activityModal').classList.add('hidden');
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            generateOriginalGanttChart();
+            generateUpdatedGanttChart();
+        });
+
+        // Close modal when clicking outside
+        document.getElementById('activityModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>
